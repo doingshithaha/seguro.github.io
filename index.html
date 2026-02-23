@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editor de plantilla con texto</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 100vh;
+    }
+    h1 {
+      margin: 0 0 1rem;
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+    .contenedor {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    .panel-canvas {
+      background: #16213e;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .panel-canvas h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      font-weight: 500;
+      color: #a0a0a0;
+    }
+    #lienzo {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      background: #0f0f1a;
+      border: 1px solid #333;
+    }
+    .panel-formulario {
+      flex: 1;
+      min-width: 280px;
+      background: #16213e;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .panel-formulario h2 {
+      margin: 0 0 1rem;
+      font-size: 1rem;
+      font-weight: 500;
+      color: #a0a0a0;
+    }
+    .campo {
+      margin-bottom: 1rem;
+    }
+    .campo label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-size: 0.85rem;
+      color: #b0b0b0;
+    }
+    .campo input,
+    .campo textarea {
+      width: 100%;
+      padding: 0.5rem 0.6rem;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #0f0f1a;
+      color: #eee;
+      font-size: 0.95rem;
+    }
+    .campo input:focus,
+    .campo textarea:focus {
+      outline: none;
+      border-color: #4a90d9;
+    }
+    .botones {
+      margin-top: 1.25rem;
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-primario {
+      background: #4a90d9;
+      color: #fff;
+    }
+    .btn-primario:hover {
+      background: #3a7bc8;
+    }
+    .btn-secundario {
+      background: #333;
+      color: #eee;
+    }
+    .btn-secundario:hover {
+      background: #444;
+    }
+    .aviso {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #2a2a4a;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: #a0a0a0;
+    }
+    .aviso strong { color: #4a90d9; }
+  </style>
+</head>
+<body>
+  <div class="contenedor">
+    <div class="panel-canvas">
+      <h2>Vista previa</h2>
+      <canvas id="lienzo"></canvas>
+    </div>
+    <div class="panel-formulario">
+      <h2>Cuadros de texto (posiciones fijas)</h2>
+      <div id="formulario"></div>
+      <div class="botones">
+        <button type="button" class="btn btn-primario" id="btnGuardar">Guardar imagen</button>
+        <button type="button" class="btn btn-secundario" id="btnActualizar">Actualizar vista</button>
+      </div>
+      <p class="aviso">
+        <strong>Uso:</strong> Coloca tu imagen plantilla en la carpeta como <code>plantilla.png</code> (o edita la ruta en el código).
+        Los textos se dibujan siempre en las mismas posiciones. Al guardar se descarga la imagen con el texto aplicado.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const hoy = new Date();
+
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    const mes = String(hoy.getMonth() + 2).padStart(2, '0');
+    const mes2 = String(hoy.getMonth() + 1).padStart(2, '0'); // Ojo: enero = 0
+    const year = hoy.getFullYear();
+
+    const fechaFormateada = `${dia}/${mes}/${year}`;
+    const fechaFormateada2 = `${dia}/${mes2}/${year}`;
+
+    // ========== CONFIGURACIÓN: imagen y posiciones fijas de cada texto ==========
+    const CONFIG = {
+        imagenUrl: 'plantilla.png',
+        campos: [
+        // Mismo id en varias filas = mismo texto en varias posiciones (solo un cuadro para escribir)
+            { id: 'nombre',   etiqueta: 'Nombre',     x: 40,  y: 149, fontSize: 11, color: '#000000', maxAncho: 300, negrita: true },
+            { id: 'nombre',   etiqueta: null,         x: 405, y: 149, fontSize: 11, color: '#000000', maxAncho: 300, negrita: true },
+            { id: 'nombre',   etiqueta: null,         x: 765, y: 150, fontSize: 11, color: '#000000', maxAncho: 300, negrita: true },
+            { id: 'patente',  etiqueta: 'Patente',    x: 320, y: 149, fontSize: 11, color: '#000000', maxAncho: 200, negrita: true },
+            { id: 'patente',  etiqueta: null,    x: 683, y: 149, fontSize: 11, color: '#000000', maxAncho: 200, negrita: true },
+            { id: 'patente',  etiqueta: null,    x: 1043, y: 149, fontSize: 11, color: '#000000', maxAncho: 200, negrita: true },
+            { id: 'fecha',    etiqueta: 'Fecha',      x: 319, y: 106, fontSize: 11, color: '#000000', maxAncho: 180, negrita: false },
+            { id: 'fecha',    etiqueta: null,      x: 681, y: 106, fontSize: 11, color: '#000000', maxAncho: 180, negrita: false },
+            { id: 'fecha',    etiqueta: null,      x: 1041, y: 108, fontSize: 11, color: '#000000', maxAncho: 180, negrita: false},
+            { id: 'fecha',    etiqueta: null,      x: 125, y: 190, fontSize: 11, color: '#000000', maxAncho: 180, negrita: true },
+            { id: 'fecha',    etiqueta: null,      x: 490, y: 191, fontSize: 11, color: '#000000', maxAncho: 180, negrita: true },
+            { id: 'fecha',    etiqueta: null,      x: 850, y: 194, fontSize: 11, color: '#000000', maxAncho: 180, negrita: true },
+            { id: 'fecha',    etiqueta: null,      x: 180, y: 235, fontSize: 11, color: '#000000', maxAncho: 180, negrita: true },
+            { id: 'fecha',    etiqueta: null,      x: 545, y: 236, fontSize: 11, color: '#000000', maxAncho: 180, negrita: true },
+            { id: 'fecha',    etiqueta: null,      x: 904, y: 238, fontSize: 11, color: '#000000', maxAncho: 180, negrita: true },
+            { id: 'fecha2',    etiqueta: null,      x: 80, y: 235, fontSize: 11, color: '#000000', maxAncho: 180, negrita: true },
+            { id: 'fecha2',    etiqueta: null,      x: 445, y: 236, fontSize: 11, color: '#000000', maxAncho: 180, negrita: true },
+            { id: 'fecha2',    etiqueta: null,      x: 805, y: 238, fontSize: 11, color: '#000000', maxAncho: 180, negrita: true },
+            { id: 'precio',    etiqueta: 'Precio',      x: 286, y: 236, fontSize: 15, color: '#000000', maxAncho: 400, negrita: true },
+            { id: 'precio',    etiqueta: null,      x: 650, y: 236, fontSize: 15, color: '#000000', maxAncho: 400, negrita: true },
+            { id: 'precio',    etiqueta: null,      x: 1012, y: 238, fontSize: 15, color: '#000000', maxAncho: 400, negrita: true },
+        ],
+    };
+
+    const canvas = document.getElementById('lienzo');
+    const ctx = canvas.getContext('2d');
+    const formulario = document.getElementById('formulario');
+    let imagenPlantilla = null;
+
+    // Crear inputs: un solo input por id (varios campos pueden compartir id y tener distintas x, y)
+    function crearFormulario() {
+      formulario.innerHTML = '';
+      const idsVistos = new Set();
+      CONFIG.campos.forEach(c => {
+        if (idsVistos.has(c.id)) return; // mismo id = mismo texto, no repetir input
+        if (c.id === 'fecha') return;   // fecha: sin input, se usa la const fechaFormateada// mismo id = mismo texto, no repetir input
+        if (c.id === 'fecha2') return;
+        idsVistos.add(c.id);
+        const div = document.createElement('div');
+        div.className = 'campo';
+        const label = document.createElement('label');
+        label.textContent = c.etiqueta || c.id;
+        label.htmlFor = c.id;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = c.id;
+        input.placeholder = 'Escribe aquí...';
+        input.addEventListener('input', dibujar);
+        input.addEventListener('change', dibujar);
+        div.appendChild(label);
+        div.appendChild(input);
+        formulario.appendChild(div);
+      });
+    }
+
+    function getValor(id) {
+      const el = document.getElementById(id);
+      return el ? el.value.trim() : '';
+    }
+
+    function dibujar() {
+      if (!imagenPlantilla || !imagenPlantilla.complete) return;
+      const w = imagenPlantilla.naturalWidth;
+      const h = imagenPlantilla.naturalHeight;
+      canvas.width = w;
+      canvas.height = h;
+
+      // 1) Dibujar siempre la misma imagen de fondo
+      ctx.drawImage(imagenPlantilla, 0, 0);
+
+      // 2) Dibujar cada texto en su posición fija
+    CONFIG.campos.forEach(c => {
+        let texto;
+        if (c.id === 'fecha') {
+            texto = fechaFormateada;
+        } else if (c.id === 'fecha2') {
+            texto = fechaFormateada2;
+        } else {
+            texto = getValor(c.id);
+        }
+        if (!texto) return;
+        ctx.font = c.negrita ? `bold ${c.fontSize}px Arial` : `${c.fontSize}px Arial`;
+        ctx.fillStyle = c.color;
+        ctx.textBaseline = 'top';
+        // Si el texto es muy largo, se puede cortar o escalar; aquí lo dibujamos tal cual
+        ctx.fillText(texto, c.x, c.y, c.maxAncho || 400);
+        });
+    }
+
+    function guardarImagen() {
+      if (!imagenPlantilla || !imagenPlantilla.complete) {
+        alert('Espera a que cargue la imagen plantilla.');
+        return;
+      }
+      dibujar();
+      const enlace = document.createElement('a');
+      enlace.download = 'plantilla_rellena.png';
+      enlace.href = canvas.toDataURL('image/png');
+      enlace.click();
+    }
+
+    function init() {
+      crearFormulario();
+      imagenPlantilla = new Image();
+      imagenPlantilla.crossOrigin = 'anonymous';
+      imagenPlantilla.onload = dibujar;
+      imagenPlantilla.onerror = () => {
+        console.warn('No se pudo cargar la plantilla. Usando fondo de ejemplo.');
+        // Canvas con fondo de ejemplo si no hay imagen
+        canvas.width = 600;
+        canvas.height = 450;
+        ctx.fillStyle = '#2a2a4a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#666';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('Coloca "plantilla.png" en esta carpeta para ver tu imagen.', 20, 30);
+      };
+      imagenPlantilla.src = CONFIG.imagenUrl;
+
+      document.getElementById('btnGuardar').addEventListener('click', guardarImagen);
+      document.getElementById('btnActualizar').addEventListener('click', dibujar);
+    }
+
+    init();
+  </script>
+</body>
+</html>
